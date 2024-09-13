@@ -223,7 +223,7 @@ SCALER_NAME = "scaler.pt"
 
 class my_trainer(Trainer):
     def __init__(self, *args, similarity=None, my_optimizer_name=None, tokenized_g_p=None,
-                 gamma=None, hook_layer=-1,model_name_or_path=None,delta=None, my_optim=None, **kwargs):
+                 gamma=None, hook_layer=-1,model_name_or_path=None,delta=None, my_optim=None, tokenizer=None, **kwargs):
         super().__init__(*args, **kwargs)  # Initialize the superclass
         self.similarity = similarity
         self.my_optimizer_name = my_optimizer_name
@@ -234,7 +234,7 @@ class my_trainer(Trainer):
         self.delta = delta
         self.my_optim = my_optim
         self.metrics_log = []
-
+        self.tokenizer = tokenizer
     
 
     def _inner_training_loop(
@@ -493,6 +493,7 @@ class my_trainer(Trainer):
 
             step = -1
             for step, inputs in enumerate(epoch_iterator):
+                # import pdb; pdb.set_trace()
                 total_batched_samples += 1
                 if rng_to_sync:
                     self._load_rng_state(resume_from_checkpoint)
@@ -633,7 +634,8 @@ class my_trainer(Trainer):
                     self.state.epoch = epoch + (step + 1 + steps_skipped) / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                 
-                    metric_temp = self._maybe_log_save_evaluate(tr_loss, model, trial, epoch, ignore_keys_for_eval)
+                    with torch.no_grad():
+                        metric_temp = self._maybe_log_save_evaluate(tr_loss, model, trial, epoch, ignore_keys_for_eval)
                     if metric_temp is not None:
                         self.metrics_log.append({'epoch': self.state.epoch, 'eval_loss': metric_temp['eval_loss'], 'eval_accuracy': metric_temp['eval_accuracy']})
                 else:
@@ -650,7 +652,8 @@ class my_trainer(Trainer):
                 self.control.should_training_stop = True
 
             self.control = self.callback_handler.on_epoch_end(args, self.state, self.control)
-            metric_temp = self._maybe_log_save_evaluate(tr_loss, model, trial, epoch, ignore_keys_for_eval)
+            with torch.no_grad():
+                metric_temp = self._maybe_log_save_evaluate(tr_loss, model, trial, epoch, ignore_keys_for_eval)
             if metric_temp is not None:
                 self.metrics_log.append({'epoch': self.state.epoch, 'eval_loss': metric_temp['eval_loss'], 'eval_accuracy': metric_temp['eval_accuracy']})
                
@@ -716,7 +719,28 @@ class my_trainer(Trainer):
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
-    def compute_loss(self, model, inputs, return_outputs=False):
+    def compute_loss(self, model, inputs, return_outputs=False, n_last_tokens=1):
+        # import pdb;pdb.set_trace()
+        input_ids = inputs['input_ids']
+        labels = inputs['input_ids'].clone()
+        
+        # input_ids2 = [self.tokenizer.decode(pred, skip_special_tokens=True) for pred in input_ids]
+        # labels2 = [self.tokenizer.decode(label, skip_special_tokens=True) for label in labels]
+        outputs = model(input_ids, labels=labels)
+        logits = outputs.logits
+
+        # 只计算最后n_last_tokens的损失
+        logits_last_tokens = logits[:, -n_last_tokens-1:-1, :]
+        labels_last_tokens = labels[:, -n_last_tokens:]
+
+        # 计算交叉熵损失
+        loss_fct = nn.CrossEntropyLoss()
+        loss = loss_fct(logits_last_tokens.view(-1, logits_last_tokens.size(-1)), labels_last_tokens.view(-1))
+
+        return (loss, outputs) if return_outputs else loss
+
+
+    def compute_loss1(self, model, inputs, return_outputs=False):
         """
         How the loss is computed by Trainer. By default, all models return the loss in the first element.
 
@@ -727,15 +751,13 @@ class my_trainer(Trainer):
         else:
             labels = None
 
-        
-
         outputs = model(**inputs)
         # embeds = model.get_prompt_embedding_to_save()
         # Save past state if it exists
         # TODO: this needs to be fixed and made cleaner later.
         if self.args.past_index >= 0:
             self._past = outputs[self.args.past_index]
-
+        # import pdb;pdb.set_trace()
         if labels is not None:
             unwrapped_model = unwrap_model(model)
             if is_peft_available() and isinstance(unwrapped_model, PeftModel):
@@ -770,8 +792,9 @@ class my_trainer(Trainer):
         if self.similarity == "L2_LM": 
             if self.model_name_or_path == "gpt2":
                 middle_embeddings = model.base_model.transformer.h[self.hook_layer].embedding_output
-                g_p_inputs_embeds = model.base_model.transformer.wte(g_p_inputs['input_ids'])
-                inputs_embeds = model.base_model.transformer.wte(inputs['input_ids'])
+                g_p_inputs_embeds = model.base_model.transformer.wte(g_p_inputs['input_ids']) #prefix task embeddings
+                inputs_embeds = model.base_model.transformer.wte(inputs['input_ids']) # whole embeddings
+                # import pdb;pdb.set_trace()
                 _ = model.base_model(inputs_embeds=g_p_inputs_embeds,
                                              position_ids=None,
                                              attention_mask=g_p_inputs['attention_mask'],
@@ -821,7 +844,7 @@ class my_trainer(Trainer):
         
         elif self.similarity == "L2":
             n_train = inputs["input_ids"].shape[0]
-            prompts = model.get_prompt(batch_size=n_train)
+            prompts = model.get_prompt(batch_size=n_train) # get prompt token
             inputs_embeds = model.word_embeddings(inputs["input_ids"])
             prompts = prompts.to(inputs_embeds.dtype)
             soft_p_inputs_embeddings = torch.cat([prompts.to(self.args.device), inputs_embeds], 1)
@@ -900,7 +923,7 @@ class my_trainer(Trainer):
                                               # [promt ids, ids of the second training data], ....]  
 
             inputs = dict(
-                label=inputs["labels"],
+                label=new_input_ids,#inputs["labels"],
                 input_ids=new_input_ids,
                 attention_mask=torch.cat([
                     torch.ones((n_train, n_prefix), dtype=torch.long).to(self.args.device),
@@ -934,7 +957,9 @@ class my_trainer(Trainer):
             `torch.Tensor`: The tensor with training loss on this batch.
         """
         model.train()
+        # import pdb; pdb.set_trace()
         inputs = self._prepare_inputs(inputs)
+        
         # print(inputs['input_ids'][0],inputs['input_ids'][1])
         
         with self.compute_loss_context_manager():
@@ -1204,7 +1229,9 @@ class my_trainer(Trainer):
         return self.optimizer
     
     def _maybe_log_save_evaluate(self, tr_loss, model, trial, epoch, ignore_keys_for_eval):
+        torch.cuda.empty_cache()
         if self.control.should_log:
+            
             if is_torch_tpu_available():
                 xm.mark_step()
 
@@ -1252,5 +1279,125 @@ class my_trainer(Trainer):
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
         return metrics
 
+    def evaluate(
+        self,
+        eval_dataset: Optional[Dataset] = None,
+        ignore_keys: Optional[List[str]] = None,
+        metric_key_prefix: str = "eval",
+    ) -> Dict[str, float]:
+        """
+        Run evaluation and returns metrics.
 
+        The calling script will be responsible for providing a method to compute metrics, as they are task-dependent
+        (pass it to the init `compute_metrics` argument).
 
+        You can also subclass and override this method to inject custom behavior.
+
+        Args:
+            eval_dataset (`Dataset`, *optional*):
+                Pass a dataset if you wish to override `self.eval_dataset`. If it is a [`~datasets.Dataset`], columns
+                not accepted by the `model.forward()` method are automatically removed. It must implement the `__len__`
+                method.
+            ignore_keys (`List[str]`, *optional*):
+                A list of keys in the output of your model (if it is a dictionary) that should be ignored when
+                gathering predictions.
+            metric_key_prefix (`str`, *optional*, defaults to `"eval"`):
+                An optional prefix to be used as the metrics key prefix. For example the metrics "bleu" will be named
+                "eval_bleu" if the prefix is "eval" (default)
+
+        Returns:
+            A dictionary containing the evaluation loss and the potential metrics computed from the predictions. The
+            dictionary also contains the epoch number which comes from the training state.
+        """
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
+
+        eval_dataloader = self.get_eval_dataloader(eval_dataset)
+        start_time = time.time()
+
+        eval_loop = self.prediction_loop if self.args.use_legacy_prediction_loop else self.evaluation_loop
+        output = eval_loop(
+            eval_dataloader,
+            description="Evaluation",
+            # No point gathering the predictions if there are no metrics, otherwise we defer to
+            # self.args.prediction_loss_only
+            prediction_loss_only=True if self.compute_metrics is None else None,
+            ignore_keys=ignore_keys,
+            metric_key_prefix=metric_key_prefix,
+        )
+
+        total_batch_size = self.args.eval_batch_size * self.args.world_size
+        if f"{metric_key_prefix}_jit_compilation_time" in output.metrics:
+            start_time += output.metrics[f"{metric_key_prefix}_jit_compilation_time"]
+        output.metrics.update(
+            speed_metrics(
+                metric_key_prefix,
+                start_time,
+                num_samples=output.num_samples,
+                num_steps=math.ceil(output.num_samples / total_batch_size),
+            )
+        )
+
+        self.log(output.metrics)
+
+        if DebugOption.TPU_METRICS_DEBUG in self.args.debug:
+            # tpu-comment: Logging debug metrics for PyTorch/XLA (compile, execute times, ops, etc.)
+            xm.master_print(met.metrics_report())
+
+        self.control = self.callback_handler.on_evaluate(self.args, self.state, self.control, output.metrics)
+
+        self._memory_tracker.stop_and_update_metrics(output.metrics)
+
+        return output.metrics
+
+    def prediction_step(self, model, inputs, prediction_loss_only, ignore_keys=None):
+        """
+        Custom prediction step to use model.generate() during evaluation instead of model(**inputs).
+        """
+        # Move inputs to the correct device
+        # import pdb;pdb.set_trace()
+        inputs = self._prepare_inputs(inputs)
+
+        # We only care about the input_ids for generation, so we extract them
+        input_ids = inputs["input_ids"][:, :-1]
+
+        # if type(model.base_model) == 'peft.peft_model.PeftModelForCausalLM':
+        # model = model.base_model#.base_model
+
+        # Use model.generate() for text generation
+        with torch.no_grad():
+            output_sequences = model.generate(
+                input_ids=input_ids, 
+                return_dict_in_generate=True, 
+                output_scores=True, 
+                max_length=inputs["input_ids"].shape[-1] + 1  # Increase length by 1 for next token
+            )
+
+        # If labels are provided, we extract them for comparison++
+        # Get the last generated token logits
+        logits = output_sequences['scores']
+        last_token_logits = logits[-1]
+        # last_token_logits = last_token_logits.unsqueeze(0)
+        # last_token_id = output_sequences['sequences'][0, -1].item()  # ID of the last generated token
+        # last_token_logit_value = last_token_logits[0, last_token_id]
+        if "labels" in inputs:
+            labels = inputs["labels"]
+            # Truncate/pad generated_tokens to match labels length for evaluation
+            # generated_tokens = self._pad_tensors_to_max_len(generated_tokens, labels.shape[-1])
+            generated_tokens = self._pad_tensors_to_max_len(output_sequences['sequences'], labels.shape[-1])
+        else:
+            labels = None
+
+        # Return the prediction, the labels, and a placeholder for the loss
+        # import pdb;pdb.set_trace()
+        return (None, last_token_logits, labels)
+    
+    def _pad_tensors_to_max_len(self, tensor, max_len):
+        """
+        Pads the tensor to the max length of the labels if needed.
+        This is useful to ensure that the generated outputs can be compared to the labels.
+        """
+        if tensor.shape[-1] < max_len:
+            padding = torch.full((tensor.shape[0], max_len - tensor.shape[-1]), self.tokenizer.pad_token_id)
+            tensor = torch.cat([padding, tensor], dim=-1)
+        return tensor

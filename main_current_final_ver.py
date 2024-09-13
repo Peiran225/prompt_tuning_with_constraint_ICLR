@@ -30,6 +30,7 @@ from my_trainer_current_final_ver import my_trainer
 from transformers import GPT2LMHeadModel,GPT2Config
 from transformers.modeling_outputs import CausalLMOutputWithCrossAttentions
 from torch.nn import CrossEntropyLoss
+import os
 
 from data import load_prompt 
 from transformers import set_seed
@@ -97,6 +98,7 @@ def main(args):
         def tokenize_function(examples):
             # max_length=None => use the model max length (it's actually the default)
             outputs = tokenizer(examples["sentence"], padding=True, truncation=True) #, max_length=None)
+            
             return outputs
         tokenized_datasets = dataset.map(
             tokenize_function,
@@ -203,6 +205,8 @@ def main(args):
     
     # add a hook to track the embeddings of middle layers of model.base_model
     def hook_fn(module, input, output):
+        import pdb;pdb.set_trace()
+        print("Hook function called with args:", input, "and kwargs:", output)
         module.embedding_output = output
 
     # init_text = "What is the sentiment of this sentence? \n Positive , Negative."#"6.00 credit(s) to open a letter from her"
@@ -232,7 +236,12 @@ def main(args):
     else:
         post_dir = '-gamma-' + str(args.gamma) + '-lr-' + str(args.learning_rate) + '-lr_LM-' + str(args.learning_rate_LM) + '-epoch-' + str(args.epoch) + '-num_of_init_text-' + str(args.num_of_initial_text) + '-seed-' + str(args.seed) + 'similarity' + str(args.similarity)
 
-    results_dir = 'results/' + 'cosine/' +model_name_or_path + '/' + args.prompt + args.task + post_dir + '.csv'
+    results_dir = 'results/' + model_name_or_path + '/' + args.task + post_dir + '.csv'
+    directory = os.path.dirname(results_dir)
+
+    # Create the directory if it doesn't exist
+    if not os.path.exists(directory):
+        os.makedirs(directory)
     new_file = True
 
     peft_config_without_layer = PromptTuningConfig(
@@ -288,7 +297,7 @@ def main(args):
             aa = [args.particular_layer]
         else:
             aa = a
-
+        # import pdb;pdb.set_trace()
         for i in aa:
             if i == -2:
                 print("train the model when the hook layer is %s"% i)
@@ -303,7 +312,7 @@ def main(args):
                     
                 if any(k in model_name_or_path for k in ("gpt", "bert", "llama")):
                     model.config.pad_token_id = tokenizer.pad_token_id
-        
+                # import pdb;pdb.set_trace()
                 trainer = my_trainer(
                     model=model,
                     args=training_args_LM,
@@ -371,6 +380,7 @@ def main(args):
                     # import pdb;pdb.set_trace()
                     model.base_model.base_model.encoder.layer[i].register_forward_hook(hook_fn) 
                     
+                
                 if any(k in model_name_or_path for k in ("gpt", "bert", "llama")):
                     model.config.pad_token_id = tokenizer.pad_token_id
                 

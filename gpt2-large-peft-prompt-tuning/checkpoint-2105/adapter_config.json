@@ -1,0 +1,16 @@
+{
+  "auto_mapping": null,
+  "base_model_name_or_path": "gpt2-large",
+  "inference_mode": true,
+  "num_attention_heads": 20,
+  "num_layers": 36,
+  "num_transformer_submodules": 1,
+  "num_virtual_tokens": 10,
+  "peft_type": "PROMPT_TUNING",
+  "prompt_tuning_init": "TEXT",
+  "prompt_tuning_init_text": "Is the sentiment of this sentence positive or negative?",
+  "revision": null,
+  "task_type": "CAUSAL_LM",
+  "token_dim": 1280,
+  "tokenizer_name_or_path": "gpt2-large"
+}

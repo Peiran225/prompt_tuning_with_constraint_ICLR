@@ -8,6 +8,11 @@ import torch
 from datasets import load_dataset
 import requests
 
+import torch
+from dataclasses import dataclass
+from transformers.tokenization_utils_base import PreTrainedTokenizerBase
+from typing import Any, Dict, List, Union
+
 from util import prepro_sentence, prepro_sentence_pair, \
     prepro_sentence_pair_single
 
@@ -533,3 +538,47 @@ def load_and_tokenize_data(task, tokenizer,model_name_or_path, data_dir=None):
     tokenized_datasets = tokenized_datasets.rename_column("label", "labels")
     return tokenized_datasets, num_label
 
+
+@dataclass
+class CustomDataCollator:
+    """
+    Data collator that will dynamically pad the inputs and labels to the length of the longest sequence in the batch.
+    """
+    tokenizer: PreTrainedTokenizerBase
+    padding: Union[bool, str] = True  # Can be 'longest', 'max_length', etc.
+    max_length: int = None  # Maximum length to pad/truncate to
+    pad_to_multiple_of: int = None  # If set, will pad sequences to a multiple of this value
+    return_tensors: str = "pt"
+
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
+        # Separate inputs and labels
+        inputs = [feature['input_ids'] for feature in features]
+        labels = [feature['label_ids'] for feature in features]
+        real_labels = [feature['labels'] for feature in features]
+
+        # Pad inputs
+        batch_inputs = self.tokenizer.pad(
+            {'input_ids': inputs, 'labels':real_labels},
+            padding=self.padding,
+            max_length=self.max_length,
+            pad_to_multiple_of=self.pad_to_multiple_of,
+            return_tensors=self.return_tensors,
+        )
+        # import pdb; pdb.set_trace()
+        # Pad labels manually (assuming labels are lists of integers)
+        max_label_length = max(len(label) for label in labels)
+        padded_labels = torch.tensor([
+            [self.tokenizer.pad_token_id] * (max_label_length - len(label)) + label # Use -100 for ignored tokens in loss calculation
+            for label in labels
+        ])
+
+        # Combine inputs and labels into a single batch
+        batch = {
+            'input_ids': batch_inputs['input_ids'],
+            'attention_mask': batch_inputs['attention_mask'],
+            # 'labels': batch_inputs['labels'],
+            'labels': padded_labels
+
+        }
+
+        return batch

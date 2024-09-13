@@ -1,0 +1,16 @@
+{
+  "auto_mapping": null,
+  "base_model_name_or_path": "bert-base-uncased",
+  "inference_mode": true,
+  "num_attention_heads": 12,
+  "num_layers": 12,
+  "num_transformer_submodules": 1,
+  "num_virtual_tokens": 12,
+  "peft_type": "PROMPT_TUNING",
+  "prompt_tuning_init": "TEXT",
+  "prompt_tuning_init_text": "Is the sentiment of this sentence positive or negative?",
+  "revision": null,
+  "task_type": "SEQ_CLS",
+  "token_dim": 768,
+  "tokenizer_name_or_path": "bert-base-uncased"
+}

@@ -1,6 +1,7 @@
 ttt.txt
 test.ipynb
 wandb/
+<<<<<<< HEAD
 bert-base-uncased-peft-prompt-tuning/
 gpt2-large-peft-prompt-tuning/
 gpt2-peft-prompt-tuning/
@@ -9,4 +10,7 @@ text.ipynb
 FacebookAI/
 roberta-large-peft-prompt-tuning/
 __pycache__/
+=======
+
+>>>>>>> 812b115 (generator code)
 

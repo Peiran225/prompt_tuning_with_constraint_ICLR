@@ -1,0 +1,5 @@
+epoch,eval_loss,eval_accuracy,layer,prompt
+1.0,0.0,0.548,-2,subj_0
+1.0,0.0,0.493,0,subj_0
+1.0,0.0,0.493,1,subj_0
+1.0,0.0,0.493,2,subj_0

@@ -1,0 +1,3 @@
+epoch,eval_loss,eval_accuracy,layer,prompt
+1.0,0.0,0.5401376146788991,-2,SST-2_3
+1.0,0.0,0.5355504587155964,0,SST-2_3
