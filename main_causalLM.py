@@ -122,7 +122,7 @@ def main(args):
     metric = evaluate.load("bleu")
     if model_name_or_path == "llama":
         model_name_or_path = "meta-llama/Llama-2-7b-hf"
-    access_token = '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'
+    access_token = ''
     # tokenizer = GPT2Tokenizer.from_pretrained(model_name_or_path, padding_side=padding_side)
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side=padding_side, token=access_token)
     if getattr(tokenizer, "pad_token_id") is None:
