@@ -837,12 +837,25 @@ class my_trainer(Trainer):
                 g_p_inputs_embeds = model.base_model.transformer.wte(g_p_inputs['input_ids'])
                 _ = model.base_model(inputs_embeds=g_p_inputs_embeds)
                 middle_embeddings_of_g_p = model.base_model.transformer.h[self.hook_layer].embedding_output
+<<<<<<< HEAD
                 # aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
             # aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
             aux_loss_0 = 1 - F.cosine_similarity(middle_embeddings[0], middle_embeddings_of_g_p[0], dim=-1)
     
+=======
+                aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
+            else:
+                middle_embeddings = model.base_model.base_model.layers[self.hook_layer].embedding_output
+                g_p_inputs_embeds = model.base_model.base_model.embed_tokens(g_p_inputs['input_ids'])
+                _ = model.base_model(inputs_embeds=g_p_inputs_embeds)
+                middle_embeddings_of_g_p = model.base_model.base_model.layers[self.hook_layer].embedding_output
+                aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
+
+            
+>>>>>>> d64cfb6 (llama2-7b res)
         
         elif self.similarity == "L2":
+            # import pdb;pdb.set_trace()
             n_train = inputs["input_ids"].shape[0]
             prompts = model.get_prompt(batch_size=n_train) # get prompt token
             inputs_embeds = model.word_embeddings(inputs["input_ids"])
@@ -863,6 +876,9 @@ class my_trainer(Trainer):
                 g_p_inputs_embeds = model.base_model.base_model.embeddings.word_embeddings(g_p_inputs['input_ids'])
             elif self.model_name_or_path == "facebook/opt-125m":
                 g_p_inputs_embeds = model.base_model.transformer.wte(g_p_inputs['input_ids'])
+            else:
+                g_p_inputs_embeds = model.base_model.base_model.embed_tokens(g_p_inputs['input_ids'])
+            
         
             # aux_loss_0 = torch.norm(soft_p_inputs_embeddings - g_p_inputs_embeds, p=2, dim=(-1, -2))
             soft_p_inputs_embeddings = torch.mean(soft_p_inputs_embeddings, dim=-1)

@@ -114,14 +114,17 @@ def main(args):
 
     #     return metric.compute(predictions=predictions, references=labels)
 
-    if any(k in model_name_or_path for k in ("gpt2", "opt", "bloom")):
+    if any(k in model_name_or_path for k in ("gpt2", "opt", "bloom", "llama")):
         padding_side = "left"
     else:
         padding_side = "right"
 
     metric = evaluate.load("bleu")
+    if model_name_or_path == "llama":
+        model_name_or_path = "meta-llama/Llama-2-7b-hf"
+    access_token = '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'
     # tokenizer = GPT2Tokenizer.from_pretrained(model_name_or_path, padding_side=padding_side)
-    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side=padding_side)
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side=padding_side, token=access_token)
     if getattr(tokenizer, "pad_token_id") is None:
         print("pad token id is none")
         tokenizer.pad_token_id = tokenizer.eos_token_id
@@ -136,8 +139,10 @@ def main(args):
         # 获取 "negative" 和 "positive" 的 token ID
         # negative_id = 4633#tokenizer.convert_tokens_to_ids("negative")
         # positive_id = 3967#tokenizer.convert_tokens_to_ids("positive")
-        negative_id = 19088
-        positive_id = 9432
+        negative_id = 8178
+        positive_id = 6374
+        # negative_id = 19088
+        # positive_id = 9432
         offset = 0
         # npdict = {negative_id:'Negative', positive_id}
         for i in range(batch_size):
@@ -188,7 +193,7 @@ def main(args):
             label_text = ["negative", "positive"]
             new_labels = [label_text[label] for label in examples['label']]
             new_sentences = ["Sentence: " + sentence + "/Sentiment: " + new_labels[i] for i, sentence in enumerate(examples['sentence'])]
-            outputs = tokenizer(new_sentences, padding=True, truncation=True) #, max_length=None)
+            outputs = tokenizer(new_sentences, padding=True, truncation=True) #, max_length=None
             # labels = tokenizer()
             # print(outputs.keys())
             # outputs['new_sent'] = new_sentences
@@ -200,6 +205,9 @@ def main(args):
             remove_columns=["idx", "sentence"],
             )
         n_last_tokens = 1
+        # tokenized_datasets['train']=tokenized_datasets['train'][:10]
+        # tokenized_datasets['train'] = tokenized_datasets['train'].select(range(500))
+
     elif args.task=="sst-5":
         dataset = load_dataset("SetFit/sst5")
         def tokenize_function(examples):
@@ -384,6 +392,8 @@ def main(args):
             each_layer = list(range(0,12))
         elif model_name_or_path=="facebook/opt-125m":
             each_layer = list(range(0,32))
+        elif 'llama' in model_name_or_path or 'Llama' in model_name_or_path:
+            each_layer = list(range(32))
 
 
         a0 = -2
@@ -409,7 +419,7 @@ def main(args):
                 # print("training with penalized model")
                 # model = AutoModelForSequenceClassification.from_pretrained(model_name_or_path, return_dict=True, cache_dir='/fs/nexus-scratch/peiran/.cache', num_labels=num_label)
                 # model = GPT2LMHeadModel.from_pretrained('gpt2')
-                model = AutoModelForCausalLM.from_pretrained(model_name_or_path)
+                model = AutoModelForCausalLM.from_pretrained(model_name_or_path, token=access_token)
                 model = get_peft_model(model, peft_config)
                 model.print_trainable_parameters()
                     
@@ -417,7 +427,7 @@ def main(args):
                     model.config.pad_token_id = tokenizer.pad_token_id
 
                     
-                # import pdb;pdb.set_trace()de
+                
                 trainer = my_trainer(
                     model=model,
                     args=training_args_LM,
@@ -532,11 +542,12 @@ def main(args):
                 # print("training with penalized model")
                 # model = AutoModelForSequenceClassification.from_pretrained(model_name_or_path, return_dict=True, cache_dir='/fs/nexus-scratch/peiran/.cache', num_labels=num_label)
                 # model = GPT2LMHeadModel.from_pretrained('gpt2')
-                model = AutoModelForCausalLM.from_pretrained(model_name_or_path)
+                model = AutoModelForCausalLM.from_pretrained(model_name_or_path, token=access_token)
                 model = get_peft_model(model, peft_config)
                 # model.print_trainable_parameters()
 
                 # add the hook to the ith layer of the model
+                # import pdb;pdb.set_trace()
                 if any(k in model_name_or_path for k in ("gpt",)):
                     model.base_model.transformer.h[i].register_forward_hook(hook_fn)
                 elif model_name_or_path == "bert-base-uncased":
@@ -545,6 +556,8 @@ def main(args):
                     model.base_model.transformer.h[i].register_forward_hook(hook_fn)
                 elif model_name_or_path == "FacebookAI/roberta-base":
                     model.base_model.base_model.encoder.layer[i].register_forward_hook(hook_fn) 
+                elif 'llama' or 'Llama' in model_name_or_path:
+                    model.base_model.base_model.layers[i].register_forward_hook(hook_fn)
                     
                 if any(k in model_name_or_path for k in ("gpt", "bert", "llama")):
                     model.config.pad_token_id = tokenizer.pad_token_id
