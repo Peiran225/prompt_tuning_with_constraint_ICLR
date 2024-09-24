@@ -231,7 +231,7 @@ def main(args):
     else:
         post_dir = '-gamma-' + str(args.gamma) + '-lr-' + str(args.learning_rate) + '-lr_LM-' + str(args.learning_rate_LM) + '-epoch-' + str(args.epoch) + '-num_of_init_text-' + str(args.num_of_initial_text) + '-seed-' + str(args.seed) + 'similarity' + str(args.similarity)
 
-    results_dir = 'results/' + model_name_or_path + '/' + args.task + post_dir + '.csv'
+    results_dir = 'results/' + model_name_or_path + '/' + args.prompt + args.task + post_dir + '.csv'
     new_file = True
 
     peft_config_without_layer = PromptTuningConfig(
@@ -270,6 +270,8 @@ def main(args):
             each_layer = list(range(0,32))
         elif model_name_or_path=="FacebookAI/roberta-base":
             each_layer = list(range(0,12))
+        elif 'roberta' in model_name_or_path:
+            each_layer = list(range(12))
         elif model_name_or_path=="facebook/opt-125m":
             each_layer = list(range(0,32))
 
@@ -294,7 +296,7 @@ def main(args):
                 tokenized_g_p['input_ids'] = torch.tensor(tokenized_g_p['input_ids'])
 
                 # print("training with penalized model")
-                model = AutoModelForSequenceClassification.from_pretrained(model_name_or_path, return_dict=True, cache_dir='/fs/nexus-scratch/peiran/.cache', num_labels=num_label)
+                model = AutoModelForSequenceClassification.from_pretrained(model_name_or_path, return_dict=True, num_labels=num_label)
                 model = get_peft_model(model, peft_config)
                 model.print_trainable_parameters()
                     
@@ -364,7 +366,8 @@ def main(args):
                     model.base_model.bert.encoder.layer[i].register_forward_hook(hook_fn)
                 elif model_name_or_path == "EleutherAI/gpt-j-6b":
                     model.base_model.transformer.h[i].register_forward_hook(hook_fn)
-                elif model_name_or_path == "FacebookAI/roberta-base":
+                elif model_name_or_path == "FacebookAI/roberta-base" or 'roberta' in model_name_or_path:
+                    # import pdb;pdb.set_trace()
                     model.base_model.base_model.encoder.layer[i].register_forward_hook(hook_fn) 
                     
                 if any(k in model_name_or_path for k in ("gpt", "bert", "llama")):
@@ -410,7 +413,7 @@ def main(args):
                 tokenized_g_p['input_ids'] = torch.tensor(tokenized_g_p['input_ids'])
 
                 # print("training with penalized model")
-                model = AutoModelForSequenceClassification.from_pretrained(model_name_or_path, return_dict=True, cache_dir='/fs/nexus-scratch/peiran/.cache', num_labels=num_label)
+                model = AutoModelForSequenceClassification.from_pretrained(model_name_or_path, return_dict=True, num_labels=num_label)
                 model = get_peft_model(model, peft_config)
                 model.print_trainable_parameters()
 
@@ -465,7 +468,7 @@ if __name__ == '__main__':
     parser.add_argument("--log_file", default=None, type=str)
     parser.add_argument("--path", default="FacebookAI/roberta-base", type=str)
     parser.add_argument("--hook_layer", default=-1, type=int)
-    parser.add_argument("--prompts_dir", default="/fs/nexus-scratch/peiran/prompting_with_constraints/prompts", type=str)
+    parser.add_argument("--prompts_dir", default="/root/projects/prompt_tuning_with_constraint_ICLR/prompts", type=str)
     parser.add_argument("--prompt_groups", default=["TRUE", ], type=list)
     parser.add_argument("--prompt", default=None, type=str)
     parser.add_argument("--task", default="trec", type=str)

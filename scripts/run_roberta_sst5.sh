@@ -36,14 +36,14 @@ CUDA_VISIBLE_DEVICES=0
 LEARNING_RATE=1e-3 # 0.1， 0.01 work
 LEARNING_RATE_LM=1e-3
 EPOCH=1
-MODEL_PATH="bert-base-uncased" # "gpt2"
+MODEL_PATH="FacebookAI/roberta-base" # "gpt2"
 GAMMA=5e-7 # 1e-8 upgrade to 0.86 at layer 3 for gpt2 small, 5e-5 for bert
-TASK="SST-2"
+TASK="sst-5"
 PROMPT_GROUP="TRUE"
 NUM_OF_INITIAL_TEXT=1
 SEED=47 #42 not working.
 # BASELINE_ONLY=True
-PROMPT="SST-2_4"
+PROMPT="sst-5_2"
 
 
 

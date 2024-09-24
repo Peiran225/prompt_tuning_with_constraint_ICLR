@@ -87,7 +87,7 @@ from transformers.trainer_pt_utils import (
     remove_dummy_checkpoint,
 )
 from transformers.trainer_utils import (
-    PREFIX_CHECKPOINT_DIR,
+    PREFIX_CHECKPOINT_DIR, 
     BestRun,
     EvalLoopOutput,
     EvalPrediction,
@@ -829,6 +829,8 @@ class my_trainer(Trainer):
                 g_p_inputs_embeds = model.base_model.transformer.wte(g_p_inputs['input_ids'])
             elif self.model_name_or_path == "FacebookAI/roberta-base":
                 g_p_inputs_embeds = model.base_model.base_model.embeddings.word_embeddings(g_p_inputs['input_ids'])
+            elif 'roberta' in self.model_name_or_path:
+                g_p_inputs_embeds = model.base_model.base_model.embeddings.word_embeddings(g_p_inputs['input_ids'])
             elif self.model_name_or_path == "facebook/opt-125m":
                 g_p_inputs_embeds = model.base_model.transformer.wte(g_p_inputs['input_ids'])
         
@@ -841,15 +843,27 @@ class my_trainer(Trainer):
         elif self.similarity == "L2_LM_prompt_only":
             prompts = model.get_prompt(batch_size=1)
 
-            print(prompts.shape)
-            _ = model.base_model(inputs_embeds=prompts)
-            middle_embeddings = model.base_model.bert.encoder.layer[self.hook_layer].embedding_output
-            g_p_ids = torch.tensor(self.tokenized_g_p['input_ids'])
-            g_p_ids_batch = g_p_ids.repeat(1, 1).to(self.args.device)
-            g_p_embeds = model.base_model.base_model.embeddings.word_embeddings.weight[g_p_ids_batch]
-            print(g_p_embeds.shape)
-            _ = model.base_model(inputs_embeds=g_p_embeds)
-            middle_embeddings_of_g_p = model.base_model.bert.encoder.layer[self.hook_layer].embedding_output
+            # print(prompts.shape)
+            if self.model_name_or_path == "bert-base-uncased":
+                _ = model.base_model(inputs_embeds=prompts)
+                middle_embeddings = model.base_model.bert.encoder.layer[self.hook_layer].embedding_output
+                g_p_ids = torch.tensor(self.tokenized_g_p['input_ids'])
+                g_p_ids_batch = g_p_ids.repeat(1, 1).to(self.args.device)
+                g_p_embeds = model.base_model.base_model.embeddings.word_embeddings.weight[g_p_ids_batch]
+                # print(g_p_embeds.shape)
+                _ = model.base_model(inputs_embeds=g_p_embeds)
+                middle_embeddings_of_g_p = model.base_model.bert.encoder.layer[self.hook_layer].embedding_output
+            elif 'roberta' in self.model_name_or_path:
+                # import pdb;pdb.set_trace()
+                _ = model.base_model(inputs_embeds=prompts)
+                middle_embeddings = model.base_model.base_model.encoder.layer[self.hook_layer].embedding_output
+                g_p_ids = torch.tensor(self.tokenized_g_p['input_ids'])
+                g_p_ids_batch = g_p_ids.repeat(1, 1).to(self.args.device)
+                g_p_inputs_embeds = model.base_model.base_model.embeddings.word_embeddings(g_p_ids_batch)
+                _ = model.base_model.base_model(inputs_embeds=g_p_inputs_embeds)
+                middle_embeddings_of_g_p = model.base_model.base_model.encoder.layer[self.hook_layer].embedding_output
+
+            
             aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
     
 
