@@ -20,7 +20,7 @@
 
 cd /root/projects/prompt_tuning_with_constraint_ICLR
 
-CUDA_VISIBLE_DEVICES=0
+CUDA_VISIBLE_DEVICES=1
 # fedadmm
 # for LEARNING_RATE in 0.012 0.014 0.016 0.02
 # for DATASET in 'synthetic_1_1' 'synthetic_0_0' 'synthetic_0.5_0.5' 'FEMNIST'

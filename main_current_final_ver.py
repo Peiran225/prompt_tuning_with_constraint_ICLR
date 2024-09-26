@@ -178,8 +178,8 @@ def main(args):
     training_args = TrainingArguments(
         output_dir=model_name_or_path + "-peft-prompt-tuning",
         learning_rate=args.learning_rate, #0.1 has great difference when using LM similarity, but the accuracy with layer -1 is low. 1e-3 if learning rate<=0.01, the projection of soft prompt will always be the original one
-        per_device_train_batch_size=32,
-        per_device_eval_batch_size=32,
+        per_device_train_batch_size=128,
+        per_device_eval_batch_size=128,
         num_train_epochs=args.epoch,
         weight_decay=0.01, #0.01
         evaluation_strategy="epoch",
@@ -191,8 +191,8 @@ def main(args):
     training_args_LM = TrainingArguments(
         output_dir=model_name_or_path + "-peft-prompt-tuning",
         learning_rate=args.learning_rate_LM, #0.1 has great difference when using LM similarity, but the accuracy with layer -1 is low. 1e-3 if learning rate<=0.01, the projection of soft prompt will always be the original one
-        per_device_train_batch_size=32,
-        per_device_eval_batch_size=32,
+        per_device_train_batch_size=128,
+        per_device_eval_batch_size=128,
         num_train_epochs=args.epoch,
         weight_decay=0.01, #0.01
         evaluation_strategy="epoch",

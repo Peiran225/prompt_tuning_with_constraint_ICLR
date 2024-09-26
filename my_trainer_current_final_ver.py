@@ -758,7 +758,11 @@ class my_trainer(Trainer):
         return (loss, outputs) if return_outputs else loss
 
     def compute_aux_loss(self, model, inputs):
-        
+        # import pdb;pdb.set_trace()
+        try:
+            model = model.module
+        except:
+            pass
         g_p_inputs = self.prepend_task_tokens(inputs)
         
 
