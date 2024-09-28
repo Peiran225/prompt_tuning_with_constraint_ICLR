@@ -18,11 +18,7 @@
 #SBATCH --partition cbcb-heng
 
 
-<<<<<<< HEAD
 cd /root/projects/prompt_tuning_with_constraint_ICLR
-=======
-# cd /fs/nexus-scratch/peiran/Prompt_tuning_with_contraint_ICLR
->>>>>>> 812b115 (generator code)
 
 CUDA_VISIBLE_DEVICES=0
 # fedadmm
