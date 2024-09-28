@@ -292,7 +292,9 @@ def prepare_data_for_parallel(tokenizer, train_data, test_data,
     return input_tensors
 
 def load_prompt(prompts_dir, prompt_task, prompt_file_len):
-    prompt_files = ["natural_prompts", "good_prompts"]
+    import pdb; pdb.set_trace()
+    # prompt_files = ["natural_prompts", "good_prompts"]
+    prompt_files = ['evo_prompts']
     if prompt_file_len < 0:
         prompt_files.append("pile")
     else:

@@ -43,7 +43,7 @@ PROMPT_GROUP="TRUE"
 NUM_OF_INITIAL_TEXT=1
 SEED=47 #42 not working.
 # BASELINE_ONLY=True
-PROMPT="trec_2"
+PROMPT="trec_4"
 
 
 

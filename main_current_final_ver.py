@@ -206,6 +206,7 @@ def main(args):
         module.embedding_output = output
 
     # init_text = "What is the sentiment of this sentence? \n Positive , Negative."#"6.00 credit(s) to open a letter from her"
+    import pdb;pdb.set_trace()
     if args.num_of_initial_text==1:
         prompt_names = [args.prompt]
     else:
@@ -231,7 +232,7 @@ def main(args):
     else:
         post_dir = '-gamma-' + str(args.gamma) + '-lr-' + str(args.learning_rate) + '-lr_LM-' + str(args.learning_rate_LM) + '-epoch-' + str(args.epoch) + '-num_of_init_text-' + str(args.num_of_initial_text) + '-seed-' + str(args.seed) + 'similarity' + str(args.similarity)
 
-    results_dir = 'results/' + model_name_or_path + '/' + args.prompt + args.task + post_dir + '.csv'
+    results_dir = 'results/' + 'cosine/' +model_name_or_path + '/' + args.prompt + args.task + post_dir + '.csv'
     new_file = True
 
     peft_config_without_layer = PromptTuningConfig(

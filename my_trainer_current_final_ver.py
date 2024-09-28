@@ -33,6 +33,7 @@ from transformers.integrations import (
     hp_params,
     is_fairscale_available,
 )
+import torch.nn.functional as F
 
 # isort: on
 
@@ -780,7 +781,7 @@ class my_trainer(Trainer):
                                              return_dict=None,
                                              token_type_ids=None)
                 middle_embeddings_of_g_p = model.base_model.transformer.h[self.hook_layer].embedding_output
-                aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p='fro')**2
+                # aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p='fro')**2
                 # norm1 = torch.norm(middle_embeddings[0], p='fro')**2
                 # norm2 = torch.norm(middle_embeddings_of_g_p[0] , p='fro')**2
             elif self.model_name_or_path == "bert-base-uncased":
@@ -788,32 +789,34 @@ class my_trainer(Trainer):
                 g_p_inputs_embeds = model.base_model.base_model.embeddings.word_embeddings.weight[g_p_inputs['input_ids']]
                 _ = model.base_model(inputs_embeds=g_p_inputs_embeds)
                 middle_embeddings_of_g_p = model.base_model.bert.encoder.layer[self.hook_layer].embedding_output
-                aux_loss_0 = torch.norm(middle_embeddings[0][0] - middle_embeddings_of_g_p[0][0], p=2)
+                # aux_loss_0 = torch.norm(middle_embeddings[0][0] - middle_embeddings_of_g_p[0][0], p=2)
                 # print(aux_loss_0)
             elif self.model_name_or_path == "gpt2-medium":
                 middle_embeddings = model.base_model.transformer.h[self.hook_layer].embedding_output
                 g_p_inputs_embeds = model.base_model.transformer.wte(g_p_inputs['input_ids'])
                 _ = model.base_model(inputs_embeds=g_p_inputs_embeds)
                 middle_embeddings_of_g_p = model.base_model.transformer.h[self.hook_layer].embedding_output
-                aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
+                # aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
             elif self.model_name_or_path == "gpt2-large":
                 middle_embeddings = model.base_model.transformer.h[self.hook_layer].embedding_output
                 g_p_inputs_embeds = model.base_model.transformer.wte(g_p_inputs['input_ids'])
                 _ = model.base_model(inputs_embeds=g_p_inputs_embeds)
                 middle_embeddings_of_g_p = model.base_model.transformer.h[self.hook_layer].embedding_output
-                aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
+                # aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
             elif self.model_name_or_path == "FacebookAI/roberta-base":
                 middle_embeddings = model.base_model.base_model.encoder.layer[self.hook_layer].embedding_output
                 g_p_inputs_embeds = model.base_model.base_model.embeddings.word_embeddings(g_p_inputs['input_ids'])
                 _ = model.base_model.base_model(inputs_embeds=g_p_inputs_embeds)
                 middle_embeddings_of_g_p = model.base_model.base_model.encoder.layer[self.hook_layer].embedding_output
-                aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
+                # aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
             elif self.model_name_or_path == "facebook/opt-125m":
                 middle_embeddings = model.base_model.transformer.h[self.hook_layer].embedding_output
                 g_p_inputs_embeds = model.base_model.transformer.wte(g_p_inputs['input_ids'])
                 _ = model.base_model(inputs_embeds=g_p_inputs_embeds)
                 middle_embeddings_of_g_p = model.base_model.transformer.h[self.hook_layer].embedding_output
-                aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
+                # aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
+            # aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
+            aux_loss_0 = 1 - F.cosine_similarity(middle_embeddings[0], middle_embeddings_of_g_p[0], dim=-1)
     
         
         elif self.similarity == "L2":
@@ -838,8 +841,11 @@ class my_trainer(Trainer):
             elif self.model_name_or_path == "facebook/opt-125m":
                 g_p_inputs_embeds = model.base_model.transformer.wte(g_p_inputs['input_ids'])
         
-            aux_loss_0 = torch.norm(soft_p_inputs_embeddings - g_p_inputs_embeds, p=2, dim=(-1, -2))
-            
+            # aux_loss_0 = torch.norm(soft_p_inputs_embeddings - g_p_inputs_embeds, p=2, dim=(-1, -2))
+            soft_p_inputs_embeddings = torch.mean(soft_p_inputs_embeddings, dim=-1)
+            g_p_inputs_embeds = torch.mean(g_p_inputs_embeds, dim=-1)
+
+            aux_loss_0 = 1 - F.cosine_similarity(soft_p_inputs_embeddings, g_p_inputs_embeds, dim=-1)            
 
         
         
@@ -868,7 +874,8 @@ class my_trainer(Trainer):
                 middle_embeddings_of_g_p = model.base_model.base_model.encoder.layer[self.hook_layer].embedding_output
 
             
-            aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
+            # aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
+            aux_loss_0 = 1 - F.cosine_similarity(middle_embeddings[0] - middle_embeddings_of_g_p[0], dim=-1)
     
 
 
