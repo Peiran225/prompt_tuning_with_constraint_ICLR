@@ -721,7 +721,7 @@ class my_trainer(Trainer):
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
-    def compute_loss(self, model, inputs, return_outputs=False, n_last_tokens=1):
+    def compute_loss(self, model, inputs, return_outputs=False, n_last_tokens=2):
         # import pdb;pdb.set_trace()
         try:
             model = model.module
@@ -742,7 +742,7 @@ class my_trainer(Trainer):
 
         # 计算交叉熵损失
         loss_fct = nn.CrossEntropyLoss()
-        loss = loss_fct(logits_last_tokens.view(-1, logits_last_tokens.size(-1)), labels_last_tokens.view(-1))
+        loss = loss_fct(logits_last_tokens.reshape(-1, logits_last_tokens.size(-1)), labels_last_tokens.reshape(-1))
 
         return (loss, outputs) if return_outputs else loss
 
@@ -1377,7 +1377,7 @@ class my_trainer(Trainer):
         Custom prediction step to use model.generate() during evaluation instead of model(**inputs).
         """
         # Move inputs to the correct device
-        
+        # import pdb;pdb.set_trace()
         try:
             model=model.module
         except:
@@ -1387,7 +1387,7 @@ class my_trainer(Trainer):
         # inputs = self.prepend_task_tokens(inputs)
 
         # We only care about the input_ids for generation, so we extract them
-        input_ids = inputs["input_ids"][:, :-1]
+        input_ids = inputs["input_ids"][:, :-2]
 
         # if type(model.base_model) == 'peft.peft_model.PeftModelForCausalLM':
         # model = model.base_model#.base_model
@@ -1396,7 +1396,7 @@ class my_trainer(Trainer):
         with torch.no_grad():
             output_sequences = model.generate(
                 input_ids=input_ids, 
-                attention_mask = inputs['attention_mask'][:,:-1],
+                attention_mask = inputs['attention_mask'][:,:-2],
                 # return_dict_in_generate=True, 
                 max_new_tokens=10,
                 # output_scores=True, 

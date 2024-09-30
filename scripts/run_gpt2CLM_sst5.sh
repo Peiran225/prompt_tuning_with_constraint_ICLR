@@ -35,7 +35,7 @@
 CUDA_VISIBLE_DEVICES=0,1
 LEARNING_RATE=1e-3 # 0.1， 0.01 work
 LEARNING_RATE_LM=1e-3
-EPOCH=2
+EPOCH=3
 MODEL_PATH="gpt2" # "gpt2" "alpaca"
 GAMMA=1e-7 # 1e-8 upgrade to 0.86 at layer 3 for gpt2 small, 5e-5 for bert
 TASK="sst-5"

@@ -73,7 +73,7 @@ PROMPT_DICT = {
     }
 
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 def main(args):
     
@@ -207,13 +207,19 @@ def main(args):
         return {"accuracy": accuracy, "eval_loss": 0.0}
 
 
+    import re
     def compute_metrics(eval_pred):
+        def extract_words(text):
+
+            words = re.findall(r'\w+', text)
+            return words
         # tokenizer = 
         # import pdb;pdb.set_trace()
-        label_text = ['terrible', 'bad', 'okay', 'good', 'great']
+        # label_text = ['terrible', 'bad', 'okay', 'good', 'great']
+        label_text = ['negative', 'positive']
         access_token = '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'
-        # tokenizer = AutoTokenizer.from_pretrained('gpt2', padding_side='left')
-        tokenizer = LlamaTokenizer.from_pretrained(model_name_or_path, padding_side='left', token=access_token)
+        tokenizer = AutoTokenizer.from_pretrained('gpt2', padding_side='left')
+        # tokenizer = LlamaTokenizer.from_pretrained(model_name_or_path, padding_side='left', token=access_token)
         # tokenizer = LlamaTokenizer.from_pretrained('chavinlo/alpaca-native', padding_side='left')
         # print("pad token id is none")
         tokenizer.pad_token_id = tokenizer.eos_token_id
@@ -225,11 +231,89 @@ def main(args):
         # import pdb;pdb.set_trace()
         correct_predictions=0
         for labelt, predt in zip(label2text, pred_txt):
-            print(predt)
+            print(predt + ' ==== ' + labelt)
             text = predt.lower()
             tmp=''
             verbalizer_dict = [k.lower() for k in label_text]
-            for word in text.split():
+            for word in extract_words(text):
+                if word in verbalizer_dict:
+                    # corret_predictions += 1
+                    tmp = word
+                    break
+            if labelt == tmp:
+                correct_predictions += 1
+
+        accuracy = correct_predictions / (total_predictions)
+        return {"accuracy": accuracy, "eval_loss": 0.0}
+    
+
+    def compute_metrics_sst5(eval_pred):
+        def extract_words(text):
+
+            words = re.findall(r'\w+', text)
+            return words
+        # tokenizer = 
+        # import pdb;pdb.set_trace()
+        label_text = ['terrible', 'bad', 'okay', 'good', 'great']
+        # label_text = ['negative', 'positive']
+        access_token = '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'
+        tokenizer = AutoTokenizer.from_pretrained('gpt2', padding_side='left')
+        # tokenizer = LlamaTokenizer.from_pretrained(model_name_or_path, padding_side='left', token=access_token)
+        # tokenizer = LlamaTokenizer.from_pretrained('chavinlo/alpaca-native', padding_side='left')
+        # print("pad token id is none")
+        tokenizer.pad_token_id = tokenizer.eos_token_id
+            
+        pred_ids, labels = eval_pred
+        total_predictions = len(labels)
+        label2text = [label_text[labels[i].item()] for i in range(len(labels))] 
+        pred_txt = tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
+        # import pdb;pdb.set_trace()
+        correct_predictions=0
+        for labelt, predt in zip(label2text, pred_txt):
+            print(predt + ' ==== ' + labelt)
+            text = predt.lower()
+            tmp=''
+            verbalizer_dict = [k.lower() for k in label_text]
+            for word in extract_words(text):
+                if word in verbalizer_dict:
+                    # corret_predictions += 1
+                    tmp = word
+                    break
+            if labelt == tmp:
+                correct_predictions += 1
+
+        accuracy = correct_predictions / (total_predictions)
+        return {"accuracy": accuracy, "eval_loss": 0.0}
+
+
+    def compute_metrics_subj(eval_pred):
+        # tokenizer = 
+        def extract_words(text):
+
+            words = re.findall(r'\w+', text)
+            return words
+        # import pdb;pdb.set_trace()
+        # label_text = ['terrible', 'bad', 'okay', 'good', 'great']
+        label_text = ['objective', 'subjective']
+        access_token = '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'
+        tokenizer = AutoTokenizer.from_pretrained('gpt2', padding_side='left')
+        # tokenizer = LlamaTokenizer.from_pretrained(model_name_or_path, padding_side='left', token=access_token)
+        # tokenizer = LlamaTokenizer.from_pretrained('chavinlo/alpaca-native', padding_side='left')
+        # print("pad token id is none")
+        tokenizer.pad_token_id = tokenizer.eos_token_id
+            
+        pred_ids, labels = eval_pred
+        total_predictions = len(labels)
+        label2text = [label_text[labels[i].item()] for i in range(len(labels))] 
+        pred_txt = tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
+        # import pdb;pdb.set_trace()
+        correct_predictions=0
+        for labelt, predt in zip(label2text, pred_txt):
+            print(' '.join(extract_words(predt)) + ' ==== ' + labelt)
+            text = predt.lower()
+            tmp=''
+            verbalizer_dict = [k.lower() for k in label_text]
+            for word in extract_words(text):
                 if word in verbalizer_dict:
                     # corret_predictions += 1
                     tmp = word
@@ -246,14 +330,18 @@ def main(args):
         # Change1: Label text tokenizer function
         def tokenize_function(examples):
             # max_length=None => use the model max length (it's actually the default)
-            label_text = ["negative", "positive"]
+            label_text = ['negative', 'positive']
+            # new_labels = [label_text[label] for label in examples['label']]
+            # new_sentences = ["Sentence: " + sentence + "/Sentiment: " + new_labels[i] for i, sentence in enumerate(examples['sentence'])]
+            template = "### Input:\n{input}\n\n### Response:\n{output}"
             new_labels = [label_text[label] for label in examples['label']]
-            new_sentences = ["Sentence: " + sentence + "/Sentiment: " + new_labels[i] for i, sentence in enumerate(examples['sentence'])]
-            outputs = tokenizer(new_sentences, padding=True, truncation=True) #, max_length=None
+            new_sentences = [template.format(input=sentence, output=new_labels[i]) for i, sentence in enumerate(examples['sentence'])]
+            outputs = tokenizer(new_sentences, padding=True, truncation=True)
             # labels = tokenizer()
             # print(outputs.keys())
-            # outputs['new_sent'] = new_sentences
-            outputs['label_ids'] = outputs['input_ids'][:]
+            outputs['new_sent'] = new_sentences
+            # outputs['label_ids'] = outputs['input_ids'][:]
+            # outputs['labels'] = [label for label in examples['label']]
             return outputs
         tokenized_datasets = dataset.map(
             tokenize_function,
@@ -327,12 +415,16 @@ def main(args):
         def tokenize_function(examples):
             # max_length=None => use the model max length (it's actually the default)
             # new_labels = [label_text for label in examples['label']]
-            new_sentences = ["Sentence: " + sentence + "/Sentiment: " + examples['label_text'][i] for i, sentence in enumerate(examples['text'])]
-            outputs = tokenizer(new_sentences, padding=True, truncation=True) #, max_length=None)
+            # label_text = ['subjective', 'objective']
+            # outputs = tokenizer(examples["text"], padding=True, truncation=True) #, max_length=None)
+            template = "### Input:\n{input}\n\n### Response:\n{output}"
+            new_labels = [label for label in examples['label_text']]
+            new_sentences = [template.format(input=sentence, output=new_labels[i]) for i, sentence in enumerate(examples['text'])]
+            outputs = tokenizer(new_sentences, padding=True, truncation=True)
             # labels = tokenizer()
             # print(outputs.keys())
-            # outputs['new_sent'] = new_sentences
-            outputs['label_ids'] = outputs['input_ids'][:]
+            outputs['new_sent'] = new_sentences
+            # outputs['label_ids'] = outputs['input_ids'][:]
             return outputs
         tokenized_datasets = dataset.map(
             tokenize_function,
@@ -370,7 +462,7 @@ def main(args):
     )
 
     training_args_LM = TrainingArguments(
-        output_dir=model_name_or_path + "-peft-prompt-tuning",
+        output_dir=model_name_or_path + "-peft-prompt-tuning2",
         learning_rate=args.learning_rate_LM, #0.1 has great difference when using LM similarity, but the accuracy with layer -1 is low. 1e-3 if learning rate<=0.01, the projection of soft prompt will always be the original one
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
@@ -503,7 +595,11 @@ def main(args):
                     model.config.pad_token_id = tokenizer.pad_token_id
 
                     
-                
+                if args.task == 'subj':
+                    compute_metrics = compute_metrics_subj
+                elif args.task == 'sst-5':
+                    compute_metrics = compute_metrics_sst5
+
                 trainer = my_trainer(
                     model=model,
                     args=training_args_LM,
