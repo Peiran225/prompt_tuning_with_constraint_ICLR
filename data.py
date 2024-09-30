@@ -297,7 +297,7 @@ def prepare_data_for_parallel(tokenizer, train_data, test_data,
     return input_tensors
 
 def load_prompt(prompts_dir, prompt_task, prompt_file_len):
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     # prompt_files = ["natural_prompts", "good_prompts"]
     prompt_files = ['evo_prompts']
     if prompt_file_len < 0:
@@ -553,7 +553,7 @@ class CustomDataCollator:
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
         # Separate inputs and labels
         inputs = [feature['input_ids'] for feature in features]
-        labels = [feature['label_ids'] for feature in features]
+        # labels = [feature['label_ids'] for feature in features]
         real_labels = [feature['labels'] for feature in features]
 
         # Pad inputs
@@ -566,18 +566,18 @@ class CustomDataCollator:
         )
         # import pdb; pdb.set_trace()
         # Pad labels manually (assuming labels are lists of integers)
-        max_label_length = max(len(label) for label in labels)
-        padded_labels = torch.tensor([
-            [self.tokenizer.pad_token_id] * (max_label_length - len(label)) + label # Use -100 for ignored tokens in loss calculation
-            for label in labels
-        ])
+        # max_label_length = max(len(label) for label in labels)
+        # padded_labels = torch.tensor([
+        #     [self.tokenizer.pad_token_id] * (max_label_length - len(label)) + label # Use -100 for ignored tokens in loss calculation
+        #     for label in labels
+        # ])
 
         # Combine inputs and labels into a single batch
         batch = {
             'input_ids': batch_inputs['input_ids'],
             'attention_mask': batch_inputs['attention_mask'],
             # 'labels': batch_inputs['labels'],
-            'labels': padded_labels
+            'label': torch.tensor(real_labels)
 
         }
 

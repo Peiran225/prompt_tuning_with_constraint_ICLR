@@ -240,6 +240,8 @@ class my_trainer(Trainer):
     def _inner_training_loop(
         self, batch_size=None, args=None, resume_from_checkpoint=None, trial=None, ignore_keys_for_eval=None
     ):
+        # import pdb;pdb.set_trace()
+        resume_from_checkpoint=None
         self.accelerator.free_memory()
         self._train_batch_size = batch_size
         logger.debug(f"Currently training with a batch size of: {self._train_batch_size}")
@@ -676,16 +678,16 @@ class my_trainer(Trainer):
             delattr(self, "_past")
 
         logger.info("\n\nTraining completed. Do not forget to share your model on huggingface.co/models =)\n\n")
-        if args.load_best_model_at_end and self.state.best_model_checkpoint is not None:
-            # Wait for everyone to get here so we are sur the model has been saved by process 0.
-            if is_torch_tpu_available():
-                xm.rendezvous("load_best_model_at_end")
-            elif args.parallel_mode == ParallelMode.DISTRIBUTED:
-                dist.barrier()
-            elif is_sagemaker_mp_enabled():
-                smp.barrier()
+        # if args.load_best_model_at_end and self.state.best_model_checkpoint is not None:
+        #     # Wait for everyone to get here so we are sur the model has been saved by process 0.
+        #     if is_torch_tpu_available():
+        #         xm.rendezvous("load_best_model_at_end")
+        #     elif args.parallel_mode == ParallelMode.DISTRIBUTED:
+        #         dist.barrier()
+        #     elif is_sagemaker_mp_enabled():
+        #         smp.barrier()
 
-            self._load_best_model()
+        #     self._load_best_model()
 
         # add remaining tr_loss
         self._total_loss_scalar += tr_loss.item()
@@ -721,6 +723,11 @@ class my_trainer(Trainer):
 
     def compute_loss(self, model, inputs, return_outputs=False, n_last_tokens=1):
         # import pdb;pdb.set_trace()
+        try:
+            model = model.module
+        except:
+            pass
+        # inputs = self.prepend_task_tokens(inputs)
         input_ids = inputs['input_ids']
         labels = inputs['input_ids'].clone()
         
@@ -790,6 +797,7 @@ class my_trainer(Trainer):
         
 
         if self.similarity == "L2_LM": 
+            # import pdb;pdb.set_trace()
             if self.model_name_or_path == "gpt2":
                 middle_embeddings = model.base_model.transformer.h[self.hook_layer].embedding_output
                 g_p_inputs_embeds = model.base_model.transformer.wte(g_p_inputs['input_ids']) #prefix task embeddings
@@ -804,7 +812,7 @@ class my_trainer(Trainer):
                                              return_dict=None,
                                              token_type_ids=None)
                 middle_embeddings_of_g_p = model.base_model.transformer.h[self.hook_layer].embedding_output
-                # aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p='fro')**2
+                aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p='fro')**2
                 # norm1 = torch.norm(middle_embeddings[0], p='fro')**2
                 # norm2 = torch.norm(middle_embeddings_of_g_p[0] , p='fro')**2
             elif self.model_name_or_path == "bert-base-uncased":
@@ -837,12 +845,10 @@ class my_trainer(Trainer):
                 g_p_inputs_embeds = model.base_model.transformer.wte(g_p_inputs['input_ids'])
                 _ = model.base_model(inputs_embeds=g_p_inputs_embeds)
                 middle_embeddings_of_g_p = model.base_model.transformer.h[self.hook_layer].embedding_output
-<<<<<<< HEAD
                 # aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
             # aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
-            aux_loss_0 = 1 - F.cosine_similarity(middle_embeddings[0], middle_embeddings_of_g_p[0], dim=-1)
+            
     
-=======
                 aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
             else:
                 middle_embeddings = model.base_model.base_model.layers[self.hook_layer].embedding_output
@@ -851,8 +857,8 @@ class my_trainer(Trainer):
                 middle_embeddings_of_g_p = model.base_model.base_model.layers[self.hook_layer].embedding_output
                 aux_loss_0 = torch.norm(middle_embeddings[0] - middle_embeddings_of_g_p[0], p=2)
 
+            # aux_loss_0 = 1 - F.cosine_similarity(middle_embeddings[0], middle_embeddings_of_g_p[0], dim=-1)
             
->>>>>>> d64cfb6 (llama2-7b res)
         
         elif self.similarity == "L2":
             # import pdb;pdb.set_trace()
@@ -880,11 +886,11 @@ class my_trainer(Trainer):
                 g_p_inputs_embeds = model.base_model.base_model.embed_tokens(g_p_inputs['input_ids'])
             
         
-            # aux_loss_0 = torch.norm(soft_p_inputs_embeddings - g_p_inputs_embeds, p=2, dim=(-1, -2))
-            soft_p_inputs_embeddings = torch.mean(soft_p_inputs_embeddings, dim=-1)
-            g_p_inputs_embeds = torch.mean(g_p_inputs_embeds, dim=-1)
+            aux_loss_0 = torch.norm(soft_p_inputs_embeddings - g_p_inputs_embeds, p=2, dim=(-1, -2))
+            # soft_p_inputs_embeddings = torch.mean(soft_p_inputs_embeddings, dim=-1)
+            # g_p_inputs_embeds = torch.mean(g_p_inputs_embeds, dim=-1)
 
-            aux_loss_0 = 1 - F.cosine_similarity(soft_p_inputs_embeddings, g_p_inputs_embeds, dim=-1)            
+            # aux_loss_0 = 1 - F.cosine_similarity(soft_p_inputs_embeddings, g_p_inputs_embeds, dim=-1)            
 
         
         
@@ -1371,8 +1377,14 @@ class my_trainer(Trainer):
         Custom prediction step to use model.generate() during evaluation instead of model(**inputs).
         """
         # Move inputs to the correct device
-        # import pdb;pdb.set_trace()
+        
+        try:
+            model=model.module
+        except:
+            pass
+        
         inputs = self._prepare_inputs(inputs)
+        # inputs = self.prepend_task_tokens(inputs)
 
         # We only care about the input_ids for generation, so we extract them
         input_ids = inputs["input_ids"][:, :-1]
@@ -1384,15 +1396,24 @@ class my_trainer(Trainer):
         with torch.no_grad():
             output_sequences = model.generate(
                 input_ids=input_ids, 
-                return_dict_in_generate=True, 
-                output_scores=True, 
+                attention_mask = inputs['attention_mask'][:,:-1],
+                # return_dict_in_generate=True, 
+                max_new_tokens=10,
+                # output_scores=True, 
                 max_length=inputs["input_ids"].shape[-1] + 1  # Increase length by 1 for next token
             )
 
+
+        # output_sequences = output_sequences[:]
+        # pred = self.tokenizer.batch_decode(
+        #     output_sequences[:, input_ids.shape[1]-1:],
+        #     skip_special_tokens=True,
+        # )
+        pred = output_sequences[:, input_ids.shape[1]-1:]
         # If labels are provided, we extract them for comparison++
-        # Get the last generated token logits
-        logits = output_sequences['scores']
-        last_token_logits = logits[-1]
+        # # Get the last generated token logits
+        # logits = output_sequences['scores']
+        # last_token_logits = logits[-1]
         # last_token_logits = last_token_logits.unsqueeze(0)
         # last_token_id = output_sequences['sequences'][0, -1].item()  # ID of the last generated token
         # last_token_logit_value = last_token_logits[0, last_token_id]
@@ -1403,10 +1424,9 @@ class my_trainer(Trainer):
             generated_tokens = self._pad_tensors_to_max_len(output_sequences['sequences'], labels.shape[-1])
         else:
             labels = None
-
-        # Return the prediction, the labels, and a placeholder for the loss
         # import pdb;pdb.set_trace()
-        return (None, last_token_logits, labels)
+        # Return the prediction, the labels, and a placeholder for the loss
+        return (None, pred, inputs['label'])
     
     def _pad_tensors_to_max_len(self, tensor, max_len):
         """

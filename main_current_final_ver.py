@@ -210,7 +210,7 @@ def main(args):
         module.embedding_output = output
 
     # init_text = "What is the sentiment of this sentence? \n Positive , Negative."#"6.00 credit(s) to open a letter from her"
-    import pdb;pdb.set_trace()
+    # import pdb;pdb.set_trace()
     if args.num_of_initial_text==1:
         prompt_names = [args.prompt]
     else:

@@ -3,8 +3,11 @@ from transformers import (
     AutoTokenizer,
     DataCollatorWithPadding,
     TrainingArguments,
-    AutoModelForCausalLM
+    AutoModelForCausalLM,
+    LlamaForCausalLM,
+    LlamaTokenizer,
 )
+
 from peft import (
     get_peft_config,
     get_peft_model,
@@ -69,6 +72,9 @@ PROMPT_DICT = {
         },
     }
 
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
 def main(args):
     
     
@@ -114,23 +120,43 @@ def main(args):
 
     #     return metric.compute(predictions=predictions, references=labels)
 
-    if any(k in model_name_or_path for k in ("gpt2", "opt", "bloom", "llama")):
+    if any(k in model_name_or_path for k in ("gpt2", "opt", "bloom", "llama", 'alpaca')):
         padding_side = "left"
     else:
         padding_side = "right"
 
     metric = evaluate.load("bleu")
-    if model_name_or_path == "llama":
-        model_name_or_path = "meta-llama/Llama-2-7b-hf"
-    access_token = ''
-    # tokenizer = GPT2Tokenizer.from_pretrained(model_name_or_path, padding_side=padding_side)
-    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side=padding_side, token=access_token)
-    if getattr(tokenizer, "pad_token_id") is None:
-        print("pad token id is none")
-        tokenizer.pad_token_id = tokenizer.eos_token_id
+    def load_model(model_name_or_path):
+        if "llama" in model_name_or_path:
+            model_name_or_path = "meta-llama/Llama-2-7b-hf"
+            access_token = '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'
+            tokenizer = LlamaTokenizer.from_pretrained(model_name_or_path, padding_side='left', token=access_token)
+            model = LlamaForCausalLM.from_pretrained(model_name_or_path, torch_dtype=torch.float16, token=access_token)
+        elif 'alpaca' in model_name_or_path:
+            special_tokens = {
+                    "bos_token": "<s>",
+                    "eos_token": "</s>",
+                    "unk_token": "<unk>"
+                }
 
-    def compute_metrics(eval_pred):
-        # import pdb;pdb.set_trace()
+            tokenizer = LlamaTokenizer.from_pretrained('chavinlo/alpaca-native', padding_side='left')
+            tokenizer.add_special_tokens(special_tokens)
+            model = LlamaForCausalLM.from_pretrained('chavinlo/alpaca-native', torch_dtype=torch.float16)
+
+            # model_name_or_path = 'chavinlo/alpaca-native'
+        else:
+
+            access_token = ''
+            # tokenizer = GPT2Tokenizer.from_pretrained(model_name_or_path, padding_side=padding_side)
+            tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side=padding_side, token=access_token)
+            model = AutoModelForCausalLM.from_pretrained(model_name_or_path, token=access_token)
+        if getattr(tokenizer, "pad_token_id") is None:
+            print("pad token id is none")
+            tokenizer.pad_token_id = tokenizer.eos_token_id
+        return tokenizer, model#, model_name_or_path
+
+    def compute_metrics2(eval_pred):
+        import pdb;pdb.set_trace()
         logits, labels = eval_pred
         batch_size = labels.shape[0]
         correct_predictions = 0
@@ -181,10 +207,40 @@ def main(args):
         return {"accuracy": accuracy, "eval_loss": 0.0}
 
 
+    def compute_metrics(eval_pred):
+        # tokenizer = 
+        # import pdb;pdb.set_trace()
+        label_text = ['terrible', 'bad', 'okay', 'good', 'great']
+        access_token = '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'
+        # tokenizer = AutoTokenizer.from_pretrained('gpt2', padding_side='left')
+        tokenizer = LlamaTokenizer.from_pretrained(model_name_or_path, padding_side='left', token=access_token)
+        # tokenizer = LlamaTokenizer.from_pretrained('chavinlo/alpaca-native', padding_side='left')
+        # print("pad token id is none")
+        tokenizer.pad_token_id = tokenizer.eos_token_id
+            
+        pred_ids, labels = eval_pred
+        total_predictions = len(labels)
+        label2text = [label_text[labels[i].item()] for i in range(len(labels))] 
+        pred_txt = tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
+        # import pdb;pdb.set_trace()
+        correct_predictions=0
+        for labelt, predt in zip(label2text, pred_txt):
+            print(predt)
+            text = predt.lower()
+            tmp=''
+            verbalizer_dict = [k.lower() for k in label_text]
+            for word in text.split():
+                if word in verbalizer_dict:
+                    # corret_predictions += 1
+                    tmp = word
+                    break
+            if labelt == tmp:
+                correct_predictions += 1
 
+        accuracy = correct_predictions / (total_predictions)
+        return {"accuracy": accuracy, "eval_loss": 0.0}
 
-
-
+    tokenizer, model = load_model(model_name_or_path)
     if args.task=="SST-2":
         dataset = load_dataset("sst2")
         # Change1: Label text tokenizer function
@@ -209,16 +265,27 @@ def main(args):
         # tokenized_datasets['train'] = tokenized_datasets['train'].select(range(500))
 
     elif args.task=="sst-5":
+        # import pdb;pdb.set_trace()
         dataset = load_dataset("SetFit/sst5")
         def tokenize_function(examples):
             # max_length=None => use the model max length (it's actually the default)
-            outputs = tokenizer(examples["text"], padding=True, truncation=True) #, max_length=None)
+            label_text = ['terrible', 'bad', 'okay', 'good', 'great']
+            # outputs = tokenizer(examples["text"], padding=True, truncation=True) #, max_length=None)
+            template = "### Input:\n{input}\n\n### Response:\n{output}"
+            new_labels = [label_text[label] for label in examples['label']]
+            new_sentences = [template.format(input=sentence, output=new_labels[i]) for i, sentence in enumerate(examples['text'])]
+            outputs = tokenizer(new_sentences, padding=True, truncation=True) #, max_length=None)
+            # outputs['label_ids']=outputs['input_ids'][:]
+            outputs['new_text'] = new_sentences
             return outputs
         tokenized_datasets = dataset.map(
             tokenize_function,
             batched=True,
             remove_columns=["text", "label_text"],
             )
+        tokenized_datasets['validation'] = tokenized_datasets['test']
+        # Delete 'old_key'
+        del tokenized_datasets['test']
         num_label = 5
     elif args.task=="agnews":
         dataset = load_dataset("ag_news")
@@ -282,43 +349,48 @@ def main(args):
     print("finishing tokeninzing")
 
     tokenized_datasets = tokenized_datasets.rename_column("label", "labels")
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     data_collator = CustomDataCollator(tokenizer=tokenizer, padding="longest")
     
     # Train (original batches 32)
     training_args = TrainingArguments(
         output_dir=model_name_or_path + "-peft-prompt-tuning",
         learning_rate=args.learning_rate, #0.1 has great difference when using LM similarity, but the accuracy with layer -1 is low. 1e-3 if learning rate<=0.01, the projection of soft prompt will always be the original one
-        per_device_train_batch_size=32,
-        per_device_eval_batch_size=2,
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
         num_train_epochs=args.epoch,
         weight_decay=0.01, #0.01
         evaluation_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
         eval_accumulation_steps=2,
-        seed=args.seed
+        seed=args.seed,
+        # local_rank=-1
+        # device='cuda:0'
     )
 
     training_args_LM = TrainingArguments(
         output_dir=model_name_or_path + "-peft-prompt-tuning",
         learning_rate=args.learning_rate_LM, #0.1 has great difference when using LM similarity, but the accuracy with layer -1 is low. 1e-3 if learning rate<=0.01, the projection of soft prompt will always be the original one
-        per_device_train_batch_size=32,
-        per_device_eval_batch_size=2,
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
         num_train_epochs=args.epoch,
         weight_decay=0.01, #0.01
         evaluation_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
         eval_accumulation_steps=2,
-        seed=args.seed
+        seed=args.seed,
+        # local_rank=-1
+        # device='cuda:0'
     
     )
     # add a hook to track the embeddings of middle layers of model.base_model
     def hook_fn(module, input, output):
         # import pdb;pdb.set_trace()
         # print("Hook function called with args:", input, "and kwargs:", output)
-        module.embedding_output = output
+        # module.embedding_output = output
+        setattr(module, 'embedding_output', output)
 
     # init_text = "What is the sentiment of this sentence? \n Positive , Negative."#"6.00 credit(s) to open a letter from her"
     if args.num_of_initial_text==1:
@@ -334,7 +406,7 @@ def main(args):
     
     init_texts = [(prompt_name, load_prompt(args.prompts_dir, prompt_name, int(args.pile_len))) for prompt_name in
                    prompt_names]
-    
+    # import pdb;pdb.set_trace()
 
 
 
@@ -346,7 +418,7 @@ def main(args):
     else:
         post_dir = '-gamma-' + str(args.gamma) + '-lr-' + str(args.learning_rate) + '-lr_LM-' + str(args.learning_rate_LM) + '-epoch-' + str(args.epoch) + '-num_of_init_text-' + str(args.num_of_initial_text) + '-seed-' + str(args.seed) + 'similarity' + str(args.similarity)
 
-    results_dir = 'results/' + model_name_or_path + '/' + args.task + post_dir + '.csv'
+    results_dir = 'results/' + model_name_or_path + '/' + args.prompt + '__' + args.task + post_dir + '.csv'
     directory = os.path.dirname(results_dir)
 
     # Create the directory if it doesn't exist
@@ -380,6 +452,7 @@ def main(args):
         
         
         #train with hook on different layer
+
         if model_name_or_path in ("gpt2", "bert-base-uncased"):
             each_layer = list(range(0,12))
         elif model_name_or_path=="gpt2-medium":
@@ -392,7 +465,7 @@ def main(args):
             each_layer = list(range(0,12))
         elif model_name_or_path=="facebook/opt-125m":
             each_layer = list(range(0,32))
-        elif 'llama' in model_name_or_path or 'Llama' in model_name_or_path:
+        elif 'llama' in model_name_or_path or 'Llama' in model_name_or_path or 'alpaca' in model_name_or_path:
             each_layer = list(range(32))
 
 
@@ -410,8 +483,10 @@ def main(args):
         # import pdb;pdb.set_trace()
         for i in aa:
             if i == -2:
-                
+                # continue
                 print("train the model when the hook layer is %s"% i)
+                tokenizer, model = load_model(model_name_or_path)
+
                 g_p = init_text #"What is the sentiment of this sentence? \n Positive , Negative."
                 tokenized_g_p = tokenizer(g_p, padding="max_length", truncation=True, max_length=num_virtual_tokens)
                 tokenized_g_p['input_ids'] = torch.tensor(tokenized_g_p['input_ids'])
@@ -419,11 +494,12 @@ def main(args):
                 # print("training with penalized model")
                 # model = AutoModelForSequenceClassification.from_pretrained(model_name_or_path, return_dict=True, cache_dir='/fs/nexus-scratch/peiran/.cache', num_labels=num_label)
                 # model = GPT2LMHeadModel.from_pretrained('gpt2')
-                model = AutoModelForCausalLM.from_pretrained(model_name_or_path, token=access_token)
+                # model = AutoModelForCausalLM.from_pretrained(model_name_or_path, token=access_token)
+                
                 model = get_peft_model(model, peft_config)
                 model.print_trainable_parameters()
                     
-                if any(k in model_name_or_path for k in ("gpt", "bert", "llama")):
+                if any(k in model_name_or_path for k in ("gpt", "bert", "llama", 'apacha')):
                     model.config.pad_token_id = tokenizer.pad_token_id
 
                     
@@ -467,62 +543,67 @@ def main(args):
                         for d in outputs_list:
                             writer.writerow(d)
             elif i == -1:
-                pass
-                # print("train the model when the hook layer is %s"% i)
-                # # wandb.init(project='prompting' + args.task, 
-                # #            entity='pyu123',
-                # #             config={ "model": args.path,
-                # #                         "learning_rate": args.learning_rate,
-                # #                         "learning_rate_LM": args.learning_rate_LM,
-                # #                         "gamma": args.gamma,
-                # #                         "epochs": args.epoch,
-                # #                         "layer": i
-                # #                         })
-                # # model = AutoModelForSequenceClassification.from_pretrained(model_name_or_path, return_dict=True, num_labels=num_label)
-                # if args.base_initial=="Random":
-                #     model = get_peft_model(model, peft_config_without_layer)
-                # else:
-                #     model = get_peft_model(model, peft_config)
+                # continue
+                print("train the model when the hook layer is %s"% i)
+                # wandb.init(project='prompting' + args.task, 
+                #            entity='pyu123',
+                #             config={ "model": args.path,
+                #                         "learning_rate": args.learning_rate,
+                #                         "learning_rate_LM": args.learning_rate_LM,
+                #                         "gamma": args.gamma,
+                #                         "epochs": args.epoch,
+                #                         "layer": i
+                #                         })
+                # model = AutoModelForSequenceClassification.from_pretrained(model_name_or_path, return_dict=True, num_labels=num_label)
+                # model = AutoModelForCausalLM.from_pretrained(model_name_or_path)
+                tokenizer, model = load_model(model_name_or_path)
+                if args.base_initial=="Random":
+                    model = get_peft_model(model, peft_config_without_layer)
+                else:
+                    model = get_peft_model(model, peft_config)
                 
                 
 
-                # if any(k in model_name_or_path for k in ("gpt",)):
-                #     # print(model_name_or_path)
-                #     model.base_model.transformer.h[i].register_forward_hook(hook_fn)
-                # elif model_name_or_path == "bert-base-uncased":
-                #     model.base_model.bert.encoder.layer[i].register_forward_hook(hook_fn)
-                # elif model_name_or_path == "EleutherAI/gpt-j-6b":
-                #     model.base_model.transformer.h[i].register_forward_hook(hook_fn)
-                # elif model_name_or_path == "FacebookAI/roberta-base":
-                #     model.base_model.base_model.encoder.layer[i].register_forward_hook(hook_fn) 
+                if any(k in model_name_or_path for k in ("gpt",)):
+                    # print(model_name_or_path)
+                    model.base_model.transformer.h[i].register_forward_hook(hook_fn)
+                elif model_name_or_path == "bert-base-uncased":
+                    model.base_model.bert.encoder.layer[i].register_forward_hook(hook_fn)
+                elif model_name_or_path == "EleutherAI/gpt-j-6b":
+                    model.base_model.transformer.h[i].register_forward_hook(hook_fn)
+                elif model_name_or_path == "FacebookAI/roberta-base":
+                    model.base_model.base_model.encoder.layer[i].register_forward_hook(hook_fn) 
+                elif any(k in model_name_or_path for k in ('llama', 'alpaca', 'Llama')):
+                    model.base_model.base_model.layers[i].register_forward_hook(hook_fn)
+
                     
                 
-                # if any(k in model_name_or_path for k in ("gpt", "bert", "llama")):
-                #     model.config.pad_token_id = tokenizer.pad_token_id
+                if any(k in model_name_or_path for k in ("gpt", "bert", "llama")):
+                    model.config.pad_token_id = tokenizer.pad_token_id
                 
 
-                # trainer = my_trainer(
-                #     model=model,
-                #     args=training_args,
-                #     train_dataset=tokenized_datasets["train"],
-                #     eval_dataset=tokenized_datasets["validation"],
-                #     tokenizer=tokenizer,
-                #     data_collator=data_collator,
-                #     compute_metrics=compute_metrics
-                #     # gamma=1e-4 #1e-4 will let aux_loss be in 1/10 of loss (around 0.8) at the beginning.
-                # ) 
-                # # eval = trainer.evaluate(eval_dataset=tokenized_datasets["validation"])
-                # # "Accuracy of projected soft prompt before train\n %s"% eval)
+                trainer = my_trainer(
+                    model=model,
+                    args=training_args,
+                    train_dataset=tokenized_datasets["train"],
+                    eval_dataset=tokenized_datasets["validation"],
+                    tokenizer=tokenizer,
+                    data_collator=data_collator,
+                    compute_metrics=compute_metrics
+                    # gamma=1e-4 #1e-4 will let aux_loss be in 1/10 of loss (around 0.8) at the beginning.
+                ) 
+                # eval = trainer.evaluate(eval_dataset=tokenized_datasets["validation"])
+                # "Accuracy of projected soft prompt before train\n %s"% eval)
 
 
-                # trainer.train()
-                # print("trainer.metrics_log %s"% trainer.metrics_log)
-                # outputs_list = trainer.metrics_log
-                # outputs_list = [{**d, 'layer': i, 'prompt': prompt_name} for d in outputs_list]
-                # with open(results_dir, 'a', newline='') as file:
-                #     writer = csv.DictWriter(file, fieldnames=headers)
-                #     for d in outputs_list:
-                #         writer.writerow(d)
+                trainer.train()
+                print("trainer.metrics_log %s"% trainer.metrics_log)
+                outputs_list = trainer.metrics_log
+                outputs_list = [{**d, 'layer': i, 'prompt': prompt_name} for d in outputs_list]
+                with open(results_dir, 'a', newline='') as file:
+                    writer = csv.DictWriter(file, fieldnames=headers)
+                    for d in outputs_list:
+                        writer.writerow(d)
             else:
                 print("train the model when the hook layer is %s"% i)
                 # wandb.init(project='prompting' + args.task, 
@@ -535,6 +616,7 @@ def main(args):
                 #                         "layer": i
                 #                         })
                 # compute the hook of the good_prompt
+                tokenizer, model = load_model(model_name_or_path)
                 g_p = init_text #"What is the sentiment of this sentence? \n Positive , Negative."
                 tokenized_g_p = tokenizer(g_p, padding="max_length", truncation=True, max_length=num_virtual_tokens)
                 tokenized_g_p['input_ids'] = torch.tensor(tokenized_g_p['input_ids'])
@@ -542,13 +624,14 @@ def main(args):
                 # print("training with penalized model")
                 # model = AutoModelForSequenceClassification.from_pretrained(model_name_or_path, return_dict=True, cache_dir='/fs/nexus-scratch/peiran/.cache', num_labels=num_label)
                 # model = GPT2LMHeadModel.from_pretrained('gpt2')
-                model = AutoModelForCausalLM.from_pretrained(model_name_or_path, token=access_token)
+
+                # model = AutoModelForCausalLM.from_pretrained(model_name_or_path, token=access_token)
                 model = get_peft_model(model, peft_config)
                 # model.print_trainable_parameters()
 
                 # add the hook to the ith layer of the model
                 # import pdb;pdb.set_trace()
-                if any(k in model_name_or_path for k in ("gpt",)):
+                if any(k in model_name_or_path for k in ("gpt",'gpt2')):
                     model.base_model.transformer.h[i].register_forward_hook(hook_fn)
                 elif model_name_or_path == "bert-base-uncased":
                     model.base_model.bert.encoder.layer[i].register_forward_hook(hook_fn)
@@ -556,10 +639,13 @@ def main(args):
                     model.base_model.transformer.h[i].register_forward_hook(hook_fn)
                 elif model_name_or_path == "FacebookAI/roberta-base":
                     model.base_model.base_model.encoder.layer[i].register_forward_hook(hook_fn) 
-                elif 'llama' or 'Llama' in model_name_or_path:
+                elif 'llama' or 'Llama' or 'alpaca' in model_name_or_path:
                     model.base_model.base_model.layers[i].register_forward_hook(hook_fn)
+                elif 'gpt' in model_name_or_path:
+                    model.base_model.transformer.h[i].register_forward_hook(hook_fn)
+                
                     
-                if any(k in model_name_or_path for k in ("gpt", "bert", "llama")):
+                if any(k in model_name_or_path for k in ("gpt", "bert", "llama", 'alpaca')):
                     model.config.pad_token_id = tokenizer.pad_token_id
         
                 trainer = my_trainer(

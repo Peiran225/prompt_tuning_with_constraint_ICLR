@@ -20,7 +20,7 @@
 
 # cd /fs/nexus-scratch/peiran/Prompt_tuning_with_contraint_ICLR
 
-CUDA_VISIBLE_DEVICES=0
+
 # fedadmm
 # for LEARNING_RATE in 0.012 0.014 0.016 0.02
 # for DATASET in 'synthetic_1_1' 'synthetic_0_0' 'synthetic_0.5_0.5' 'FEMNIST'
@@ -35,24 +35,25 @@ CUDA_VISIBLE_DEVICES=0
 
 LEARNING_RATE=1e-3 # 0.1， 0.01 work
 LEARNING_RATE_LM=1e-3
-EPOCH=1
-MODEL_PATH="gpt2" # "gpt2"
+EPOCH=2
+MODEL_PATH="meta-llama/Llama-2-7b-hf" # "gpt2" "alpaca"
 GAMMA=1e-7 # 1e-8 upgrade to 0.86 at layer 3 for gpt2 small, 5e-5 for bert
-TASK="SST-2"
+TASK="sst-5"
 PROMPT_GROUP="TRUE"
 NUM_OF_INITIAL_TEXT=1
 SEED=47 #42 not working.
 # BASELINE_ONLY=True
-PROMPT="SST-2_0"
+PROMPT="sst-5_2"
 
 
 
-
+CUDA_VISIBLE_DEVICES=0,1
 
 for SEED in 50
 # GAMMA not working 1e-3 5e-4 1e-4 5e-5 1e-5 1e-6 1e-7 5e-8 1e-8 working: 5e-7
 # SEED 47 50(best) works 
 do
+    
     python3 main_causalLM.py --learning_rate=$LEARNING_RATE --learning_rate_LM=$LEARNING_RATE  \
                              --epoch=$EPOCH --path=$MODEL_PATH --gamma=$GAMMA --task=$TASK \
                              --num_of_initial_text=$NUM_OF_INITIAL_TEXT --baseline_only=$BASELINE_ONLY \
