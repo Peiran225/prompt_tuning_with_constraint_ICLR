@@ -1,5 +1,5 @@
 {
-  "best_metric": 0.2859477996826172,
+  "best_metric": 0.3295072019100189,
   "best_model_checkpoint": "bert-base-uncased-peft-prompt-tuning/checkpoint-2105",
   "epoch": 1.0,
   "eval_steps": 500,
@@ -10,41 +10,41 @@
   "log_history": [
     {
       "epoch": 0.24,
-      "learning_rate": 0.0007624703087885985,
-      "loss": 0.4754,
+      "learning_rate": 0.0008812351543942994,
+      "loss": 0.4309,
       "step": 500
     },
     {
       "epoch": 0.48,
-      "learning_rate": 0.0005249406175771972,
-      "loss": 0.3184,
+      "learning_rate": 0.0007624703087885985,
+      "loss": 0.322,
       "step": 1000
     },
     {
       "epoch": 0.71,
-      "learning_rate": 0.00028741092636579575,
-      "loss": 0.3038,
+      "learning_rate": 0.0006437054631828979,
+      "loss": 0.3027,
       "step": 1500
     },
     {
       "epoch": 0.95,
-      "learning_rate": 4.98812351543943e-05,
-      "loss": 0.2951,
+      "learning_rate": 0.0005249406175771972,
+      "loss": 0.2941,
       "step": 2000
     },
     {
       "epoch": 1.0,
-      "eval_accuracy": 0.8887614678899083,
-      "eval_loss": 0.2859477996826172,
-      "eval_runtime": 0.8414,
-      "eval_samples_per_second": 1036.343,
-      "eval_steps_per_second": 33.277,
+      "eval_accuracy": 0.8658256880733946,
+      "eval_loss": 0.3295072019100189,
+      "eval_runtime": 1.4384,
+      "eval_samples_per_second": 606.209,
+      "eval_steps_per_second": 19.465,
       "step": 2105
     }
   ],
   "logging_steps": 500,
-  "max_steps": 2105,
-  "num_train_epochs": 1,
+  "max_steps": 4210,
+  "num_train_epochs": 2,
   "save_steps": 500,
   "total_flos": 2263459151153928.0,
   "trial_name": null,

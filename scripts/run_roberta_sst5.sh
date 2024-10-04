@@ -20,7 +20,7 @@
 
 cd /root/projects/prompt_tuning_with_constraint_ICLR
 
-CUDA_VISIBLE_DEVICES=0
+CUDA_VISIBLE_DEVICES=0,1
 # fedadmm
 # for LEARNING_RATE in 0.012 0.014 0.016 0.02
 # for DATASET in 'synthetic_1_1' 'synthetic_0_0' 'synthetic_0.5_0.5' 'FEMNIST'
@@ -35,15 +35,15 @@ CUDA_VISIBLE_DEVICES=0
 
 LEARNING_RATE=1e-3 # 0.1， 0.01 work
 LEARNING_RATE_LM=1e-3
-EPOCH=1
+EPOCH=5
 MODEL_PATH="FacebookAI/roberta-base" # "gpt2"
-GAMMA=5e-7 # 1e-8 upgrade to 0.86 at layer 3 for gpt2 small, 5e-5 for bert
+GAMMA=5e-6 # 1e-8 upgrade to 0.86 at layer 3 for gpt2 small, 5e-5 for bert
 TASK="sst-5"
 PROMPT_GROUP="TRUE"
 NUM_OF_INITIAL_TEXT=1
 SEED=47 #42 not working.
 # BASELINE_ONLY=True
-PROMPT="sst-5_2"
+PROMPT="sst-5_0"
 
 
 

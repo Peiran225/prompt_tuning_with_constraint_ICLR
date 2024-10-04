@@ -1,0 +1,16 @@
+{
+  "auto_mapping": null,
+  "base_model_name_or_path": "gpt2",
+  "inference_mode": true,
+  "num_attention_heads": 12,
+  "num_layers": 12,
+  "num_transformer_submodules": 1,
+  "num_virtual_tokens": 59,
+  "peft_type": "PROMPT_TUNING",
+  "prompt_tuning_init": "TEXT",
+  "prompt_tuning_init_text": "Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.\n\n### Instruction:\nidentify the type of answer (i.e. number, description, or entity) to be provided for each given question.",
+  "revision": null,
+  "task_type": "CAUSAL_LM",
+  "token_dim": 768,
+  "tokenizer_name_or_path": "gpt2"
+}

@@ -20,7 +20,7 @@
 
 cd /root/projects/prompt_tuning_with_constraint_ICLR
 
-CUDA_VISIBLE_DEVICES=1
+CUDA_VISIBLE_DEVICES=0
 # fedadmm
 # for LEARNING_RATE in 0.012 0.014 0.016 0.02
 # for DATASET in 'synthetic_1_1' 'synthetic_0_0' 'synthetic_0.5_0.5' 'FEMNIST'
@@ -35,7 +35,7 @@ CUDA_VISIBLE_DEVICES=1
 
 LEARNING_RATE=1e-3 # 0.1， 0.01 work
 LEARNING_RATE_LM=1e-3
-EPOCH=1
+EPOCH=2
 MODEL_PATH="bert-base-uncased" # "gpt2"
 GAMMA=5e-7 # 1e-8 upgrade to 0.86 at layer 3 for gpt2 small, 5e-5 for bert
 TASK="sst-5"
@@ -53,6 +53,7 @@ for SEED in 50
 # GAMMA not working 1e-3 5e-4 1e-4 5e-5 1e-5 1e-6 1e-7 5e-8 1e-8 working: 5e-7
 # SEED 47 50(best) works 
 do
+    CUDA_VISIBLE_DEVICES=0
     python3 main_current_final_ver.py --learning_rate=$LEARNING_RATE --learning_rate_LM=$LEARNING_RATE  \
                              --epoch=$EPOCH --path=$MODEL_PATH --gamma=$GAMMA --task=$TASK \
                              --num_of_initial_text=$NUM_OF_INITIAL_TEXT --baseline_only=$BASELINE_ONLY \

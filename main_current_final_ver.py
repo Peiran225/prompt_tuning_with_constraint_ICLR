@@ -26,11 +26,11 @@ import argparse
 import logging
 import json
 import csv
-from my_trainer_current_final_ver import my_trainer
+# from my_trainer_current_final_ver import my_trainer
+from my_trainer_linear import my_trainer
 from transformers import GPT2LMHeadModel,GPT2Config
 from transformers.modeling_outputs import CausalLMOutputWithCrossAttentions
 from torch.nn import CrossEntropyLoss
-import os
 
 from data import load_prompt 
 from transformers import set_seed
@@ -98,7 +98,6 @@ def main(args):
         def tokenize_function(examples):
             # max_length=None => use the model max length (it's actually the default)
             outputs = tokenizer(examples["sentence"], padding=True, truncation=True) #, max_length=None)
-            
             return outputs
         tokenized_datasets = dataset.map(
             tokenize_function,
@@ -180,33 +179,33 @@ def main(args):
     training_args = TrainingArguments(
         output_dir=model_name_or_path + "-peft-prompt-tuning",
         learning_rate=args.learning_rate, #0.1 has great difference when using LM similarity, but the accuracy with layer -1 is low. 1e-3 if learning rate<=0.01, the projection of soft prompt will always be the original one
-        per_device_train_batch_size=128,
-        per_device_eval_batch_size=128,
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
         num_train_epochs=args.epoch,
         weight_decay=0.01, #0.01
         evaluation_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
+        eval_accumulation_steps=2,
         seed=args.seed
     )
 
     training_args_LM = TrainingArguments(
         output_dir=model_name_or_path + "-peft-prompt-tuning",
         learning_rate=args.learning_rate_LM, #0.1 has great difference when using LM similarity, but the accuracy with layer -1 is low. 1e-3 if learning rate<=0.01, the projection of soft prompt will always be the original one
-        per_device_train_batch_size=128,
-        per_device_eval_batch_size=128,
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
         num_train_epochs=args.epoch,
         weight_decay=0.01, #0.01
         evaluation_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
+        eval_accumulation_steps=2,
         seed=args.seed
     )
     
     # add a hook to track the embeddings of middle layers of model.base_model
     def hook_fn(module, input, output):
-        import pdb;pdb.set_trace()
-        print("Hook function called with args:", input, "and kwargs:", output)
         module.embedding_output = output
 
     # init_text = "What is the sentiment of this sentence? \n Positive , Negative."#"6.00 credit(s) to open a letter from her"
@@ -227,7 +226,7 @@ def main(args):
     
 
 
-
+    import os
     
     if args.base_initial=="Random":
         post_dir = '-gamma-' + str(args.gamma) + '-lr-' + str(args.learning_rate) + '-lr_LM-' + str(args.learning_rate_LM) + '-epoch-' + str(args.epoch) + '-num_of_init_text-' + str(args.num_of_initial_text) + '-seed-' + str(args.seed) + '-random_init_baseline'
@@ -236,12 +235,11 @@ def main(args):
     else:
         post_dir = '-gamma-' + str(args.gamma) + '-lr-' + str(args.learning_rate) + '-lr_LM-' + str(args.learning_rate_LM) + '-epoch-' + str(args.epoch) + '-num_of_init_text-' + str(args.num_of_initial_text) + '-seed-' + str(args.seed) + 'similarity' + str(args.similarity)
 
-    results_dir = 'results/' + model_name_or_path + '/' + args.task + post_dir + '.csv'
+    results_dir = 'results/' +model_name_or_path + '/newprompt/' + args.prompt +'__'+ args.task + post_dir + '.csv'
     directory = os.path.dirname(results_dir)
-
-    # Create the directory if it doesn't exist
     if not os.path.exists(directory):
         os.makedirs(directory)
+    # new_file = True
     new_file = True
 
     peft_config_without_layer = PromptTuningConfig(
@@ -297,7 +295,7 @@ def main(args):
             aa = [args.particular_layer]
         else:
             aa = a
-        # import pdb;pdb.set_trace()
+
         for i in aa:
             if i == -2:
                 print("train the model when the hook layer is %s"% i)
@@ -312,7 +310,7 @@ def main(args):
                     
                 if any(k in model_name_or_path for k in ("gpt", "bert", "llama")):
                     model.config.pad_token_id = tokenizer.pad_token_id
-                # import pdb;pdb.set_trace()
+        
                 trainer = my_trainer(
                     model=model,
                     args=training_args_LM,
@@ -380,7 +378,6 @@ def main(args):
                     # import pdb;pdb.set_trace()
                     model.base_model.base_model.encoder.layer[i].register_forward_hook(hook_fn) 
                     
-                
                 if any(k in model_name_or_path for k in ("gpt", "bert", "llama")):
                     model.config.pad_token_id = tokenizer.pad_token_id
                 
@@ -506,7 +503,6 @@ if __name__ == '__main__':
 
      #gpt2=gpt small
     main(args)
-
 
 
 
